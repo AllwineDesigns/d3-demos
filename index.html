@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta charset="utf-8">
+<style>
+
+@font-face {
+    font-family: "futura-pt";
+    font-style: normal;
+    font-weight: 500;
+    src: url("https://fonts.typekit.net/af/9749f0/00000000000000000001008f/27/l?subset_id=2&fvd=n5");
+}
+
+svg {
+    display: block;
+    margin: auto;
+    font-family: futura-pt;
+}
+
+.container {
+    position: absolute;
+    top: 20px;
+    bottom: 20px;
+    width: 100%;
+}
+</style>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+
+</head>
+<body>
+<div class="container">
+<svg id="encoder" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid"></svg>
+</div>
+<script>
+
+// TODO refactor to be more modular, so multiple encoders can easily be added to the page
+
+var width = 400;
+var height = 400;
+
+var box_width = 40;
+var box_height = 40;
+
+var margin = 20;
+
+var detent_tip = 5;
+var detent_angle = 2;
+
+var detent_thickness = 20;
+var ring_thickness = 20;
+var outer_diameter = width-2*margin;
+
+var ring_diameter = outer_diameter-2*detent_thickness;
+var inner_diameter = ring_diameter-2*ring_thickness-2*detent_thickness;
+
+var sensor_thickness = 40;
+
+var detents = 10;
+
+var detents_angle = 360/detents;
+var svg = d3.select("svg");
+var center_g;
+var pressed = false;
+var last_mouse_angle = 0;
+var cur_angle = 0;
+var desired_angle = 0;
+var sensor_r = 3;
+var last_state = "11";
+var last_a = true;
+var last_b = true;
+var encoderValue = 0;
+
+var rotary_g;
+var circle_a;
+var circle_b;
+var text_a;
+var text_b;
+var text_encoder;
+
+var svg = d3.select("svg");
+
+function resize() {
+    var rect = d3.select(".container").node().getBoundingClientRect();
+    var dim = Math.min(rect.width, rect.height);
+    svg.style("width", dim + "px");
+    svg.style("height", dim + "px");
+}
+
+d3.select(window).on("resize", resize);
+
+rotary_encoder();
+resize();
+
+function onPressed() {
+    var m = d3.mouse(svg.node());
+    if(m[0] > 0 && m[1] > 0 && m[0] < 400 && m[1] < 400) {
+        var angle = Math.atan2(-(m[1]-200), m[0]-200)*180/Math.PI;
+        if(angle < 0) {
+            angle += 360;
+        }
+        last_mouse_angle = angle;
+        pressed = true;
+    }
+}
+function onReleased() {
+    pressed = false;
+    desired_angle = Math.round(desired_angle/detents_angle)*detents_angle
+    update();
+}
+
+function onDrag() {
+    if(pressed) {
+        d3.event.preventDefault();
+        var m = d3.mouse(svg.node());
+        var angle = Math.atan2(-(m[1]-200), m[0]-200)*180/Math.PI;
+        if(angle < 0) {
+            angle += 360;
+        }
+
+        var da = last_mouse_angle-angle;
+        if(da < -180) {
+            da += 360;
+        } else if(da > 180) {
+            da -= 360;
+        }
+
+        desired_angle += da;
+
+        last_mouse_angle = angle;
+        update();
+    }
+}
+
+function isEven(n) {
+    return n%2 == 0;
+}
+
+function update() {
+    var new_angle = .02*desired_angle+.98*cur_angle;
+
+    if(new_angle-cur_angle > detents_angle/4) {
+        new_angle = cur_angle+detents_angle/4;
+    } else if(cur_angle-new_angle > detents_angle/4) {
+        new_angle = cur_angle-detents_angle/4;
+    }
+
+    cur_angle = new_angle;
+
+    var a_value = isEven(Math.round((cur_angle+detents_angle/8)/(detents_angle/2)));
+    var b_value = isEven(Math.round((cur_angle-detents_angle/8)/(detents_angle/2)));
+
+    var a_text = a_value ? "1" : "0";
+    var b_text = b_value ? "1" : "0";
+
+    if(last_a != a_value) {
+        text_a.text(a_text);
+        circle_a.attr("fill", a_value ? "white" : "#02afd3");
+
+        last_a = a_value;
+    }
+
+    if(last_b != b_value) {
+        text_b.text(b_text);
+        circle_b.attr("fill", b_value ? "white" : "#02afd3");
+
+        last_b = b_value;
+    }
+
+
+    var state = a_text + b_text;
+    if(state != last_state) {
+// from Arduino code
+//      if(sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) encoderValue ++;
+//      if(sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) encoderValue --;
+
+        d3.selectAll(".gray_code" + last_state).attr("fill", "white");
+        d3.selectAll(".gray_code" + state).attr("fill", "#96d6a3");
+
+        var test = last_state + state;
+        if(test == "1101" || test == "0100" || test == "0010" || test == "1011") {
+            encoderValue++;
+            center_g.append("text").text("+1").attr("text-anchor", "middle").attr("y", 50).transition().duration(500).tween("x", function() {
+                  var node = this;
+                  var currentValue = +node.getAttribute("x");
+
+                  return function(t) {
+                      var tt = Math.sqrt(Math.sqrt(t));
+                      node.setAttribute("x", tt*50);
+                  }
+            }).remove();
+        }
+
+        if(test == "1110" || test == "0111" || test == "0001" || test == "1000") {
+            encoderValue--;
+            center_g.append("text").text("-1").attr("text-anchor", "middle").attr("y", 50).transition().duration(500).tween("x", function() {
+                  var node = this;
+                  var currentValue = +node.getAttribute("x");
+
+                  return function(t) {
+                      var tt = Math.sqrt(Math.sqrt(t));
+                      node.setAttribute("x", -tt*50);
+                  }
+            }).remove();
+        }
+
+        if(encoderValue >= 4) {
+            encoderValue -= 4;
+
+            center_g.append("text").text("-4").attr("text-anchor", "middle").attr("y", 50).transition().duration(500).tween("x", function() {
+                  var node = this;
+                  var currentValue = +node.getAttribute("x");
+
+                  return function(t) {
+                      var tt = Math.sqrt(Math.sqrt(t));
+                      node.setAttribute("x", -tt*50);
+                  }
+            }).remove();
+
+            center_g.append("text").text("Mouse Wheel Up!").attr("text-anchor", "middle").attr("y", 80).attr("class", "message").
+              transition().duration(500).tween('fastInSlowOut', function() {
+                  var node = this;
+                  var currentValue = +node.getAttribute("y");
+
+                  return function(t) {
+                      var tt = Math.sqrt(Math.sqrt(t));
+                      node.setAttribute("y", (1-tt)*80+tt*100);
+                  }
+              }).remove();
+        }
+        if(encoderValue <= -4) {
+            encoderValue += 4;
+
+            center_g.append("text").text("+4").attr("text-anchor", "middle").attr("y", 50).transition().duration(500).tween("x", function() {
+                  var node = this;
+                  var currentValue = +node.getAttribute("x");
+
+                  return function(t) {
+                      var tt = Math.sqrt(Math.sqrt(t));
+                      node.setAttribute("x", tt*50);
+                  }
+            }).remove();
+
+            center_g.append("text").text("Mouse Wheel Down!").attr("text-anchor", "middle").attr("y", 80).attr("class", "message").
+              transition().duration(500).tween('fastInSlowOut', function() {
+                  var node = this;
+                  var currentValue = +node.getAttribute("y");
+
+                  return function(t) {
+                      var tt = Math.sqrt(Math.sqrt(t));
+                      node.setAttribute("y", (1-tt)*80+tt*100);
+                  }
+              }).remove();
+        }
+        text_encoder.text(encoderValue);
+
+        last_state = state;
+    }
+
+    rotary_g.attr("transform", "rotate(" + cur_angle + ")");
+
+    if(Math.abs(cur_angle - desired_angle) > .1) {
+        setTimeout(update, 32);
+    }
+}
+
+d3.select(document).on("mousedown", onPressed);
+d3.select(document).on("mouseup", onReleased);
+d3.select(document).on("touchstart", onPressed);
+d3.select(document).on("touchend", onReleased);
+d3.select(document).on("mousemove", onDrag);
+d3.select(document).on("touchmove", onDrag);
+
+function rotary_encoder() {
+    var angle = Math.PI/detents;
+    var degrees = 180/detents;
+
+    center_g = svg.append("g").attr("transform", "translate(" + width/2 + ", " + height/2 + ")");
+    rotary_g = center_g.append("g").attr("transform", "rotate(-90)").append("g").attr("transform", "rotate(0)");
+//    rotary_g.append("circle").attr("r", inner_diameter/2).attr("fill", "none").attr("stroke", "black");
+//    rotary_g.append("circle").attr("r", outer_diameter/2).attr("fill", "none").attr("stroke", "black");
+
+    var sensors_g = center_g.append("g").attr("transform", "rotate(-90)");
+    
+    sensors_g.append("path").attr("d", "M " + (outer_diameter/2-2) + " 0 " +
+                                "L " + (outer_diameter/2+5) + " 5 " + 
+                                "L " + (outer_diameter/2+5) + " -5 ").attr("stroke", "black");
+
+    var sensor_x = (ring_diameter/2-ring_thickness/2)*Math.sin(-Math.PI/180*detents_angle/8);
+    sensors_g.append("line").attr("x1", ring_diameter/2-ring_thickness/2).attr("y1", -sensor_x)
+                            .attr("x2", inner_diameter/2-20).attr("y2", -sensor_x).attr("stroke", "black");
+    sensors_g.append("line").attr("x1", ring_diameter/2-ring_thickness/2).attr("y1", sensor_x)
+                            .attr("x2", inner_diameter/2-20).attr("y2", sensor_x).attr("stroke", "black");
+
+    circle_b = sensors_g.append("g").attr("transform", "rotate(" + detents_angle/8 + ")").
+        append("circle").attr("cx", ring_diameter/2-ring_thickness/2).attr("r", sensor_r).attr("stroke", "black").attr("fill", "white").attr("stroke-width", .5);
+
+    circle_a = sensors_g.append("g").attr("transform", "rotate(" + -(detents_angle/8) + ")").
+        append("circle").attr("cx", ring_diameter/2-ring_thickness/2).attr("r", sensor_r).attr("stroke", "black").attr("fill", "white").attr("stroke-width", .5);
+
+    center_g.append("text").text("A").attr("text-anchor", "middle").attr("x", sensor_x).attr("y", -ring_diameter/2-2);
+    center_g.append("text").text("B").attr("text-anchor", "middle").attr("x", -sensor_x).attr("y", -ring_diameter/2-2);
+
+    text_a = center_g.append("text").text("1").attr("text-anchor", "middle").attr("x", sensor_x).attr("y", -(inner_diameter/2-40));
+    text_b = center_g.append("text").text("1").attr("text-anchor", "middle").attr("x", -sensor_x).attr("y", -(inner_diameter/2-40));
+
+    text_encoder = center_g.append("text").text("0").attr("text-anchor", "middle").attr("y", 50);
+
+    var gray_codes = [ "11", "01", "00", "10" ];
+    for(var i = 3; i >= 0; i--) {
+        center_g.append("rect").attr("x", i*box_width-4*box_width/2)
+                               .attr("y", -box_height/2).attr("width", box_width)
+                               .attr("height", box_height)
+                               .attr("fill", i == 0 ? "#96d6a3" : "white")
+                               .attr("stroke", "black")
+                               .attr("class", "gray_code" + gray_codes[i%4]);
+        center_g.append("text").attr("x", i*box_width-4*box_width/2+.5*box_width)
+                               .attr("y", 0)
+                               .attr("alignment-baseline", "middle")
+                               .attr("text-anchor", "middle")
+                               .text(gray_codes[i%4]);
+    }
+
+    var sin_angle = -Math.sin(angle);
+    var cos_angle = Math.cos(angle);
+
+    var sin_angle_ = -Math.sin(2*angle);
+    var cos_angle_ = Math.cos(2*angle);
+    var sin_angle1 = -Math.sin(detent_angle*Math.PI/180);
+    var cos_angle1 = Math.cos(detent_angle*Math.PI/180);
+    var sin_angle2 = -Math.sin(2*angle-detent_angle*Math.PI/180);
+    var cos_angle2 = Math.cos(2*angle-detent_angle*Math.PI/180);
+    for(var i = 0; i < 2*detents; i++) {
+        var r1 = ring_diameter/2-ring_thickness;
+        var r2 = ring_diameter/2;
+
+        if(!(i % 2)) {
+            var d = "M " + r2 + " 0 " +
+                    "A " + r2 + " " + r2 + " 0 0 0 " + r2*cos_angle + " " + r2*sin_angle + " " +
+                    "L " + r1*cos_angle + " " + r1*sin_angle + " " +
+                    "A " + r1 + " " + r1 + " 0 0 1 " + r1 + " 0 Z";
+            var g = rotary_g.append("g").attr("transform", "rotate(" + (degrees*i-degrees/2) + ")");
+            g.append("path").
+              attr("d", d).
+              attr("fill", "#02afd3").
+              attr("stroke", "#02afd3");
+              /*
+            g.append("g").attr("transform", "rotate(" + (-degrees/2) + ")").
+              append("path").
+                attr("d", "M " + inner_diameter/2 + " 0 L " + outer_diameter/2 + " 0 Z").
+                attr("stroke", "black").
+                attr("stroke-width", 1);
+
+                    */
+
+            var or = outer_diameter/2;
+            var ir = inner_diameter/2;
+            var d2 = "M " + (or-detent_tip) + " 0 " +
+                     "L " + or*cos_angle1 + " " + or*sin_angle1 + " " +
+                     "A " + or + " " + or + " 0 0 0 " + or*cos_angle2 + " " + or*sin_angle2 + " " +
+                     "L " + (or-detent_tip)*cos_angle_ + " " + (or-detent_tip)*sin_angle_;
+
+            var d3 = "M " + ir*cos_angle_ + " " + ir*sin_angle_ + " " +
+                     "L " + ir*cos_angle2 + " " + ir*sin_angle2 + " " +
+                     "A " + ir + " " + ir + " 0 0 1 " + ir*cos_angle1 + " " + ir*sin_angle1 + " " +
+                     "L " + ir + " 0 ";
+            g = rotary_g.append("g").attr("transform", "rotate(" + (degrees*i) + ")");
+            g.append("path").
+              attr("d", d2).
+              attr("fill", "none").
+              attr("stroke", "black");
+            g.append("path").
+              attr("d", d3).
+              attr("fill", "none").
+              attr("stroke", "black");
+        }
+
+    }
+}
+
+</script>
+</body>
+</html>
