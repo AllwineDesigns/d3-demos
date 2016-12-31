@@ -18,12 +18,29 @@ svg {
     font-family: futura-pt;
 }
 
+.highlighted {
+    fill: #f0f0f0;
+}
+
 .container {
     position: absolute;
     top: 20px;
     bottom: 20px;
     width: 100%;
 }
+
+.popup_text {
+    fill: #cccccc;
+}
+
+path {
+    stroke: #cccccc;
+}
+
+rect {
+    stroke: #cccccc;
+}
+
 </style>
 <script src="https://d3js.org/d3.v4.min.js"></script>
 
@@ -174,13 +191,13 @@ function update() {
 //      if(sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) encoderValue ++;
 //      if(sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) encoderValue --;
 
-        d3.selectAll(".gray_code" + last_state).attr("fill", "white");
-        d3.selectAll(".gray_code" + state).attr("fill", "#96d6a3");
+        d3.selectAll(".gray_code" + last_state).classed("highlighted", false);
+        d3.selectAll(".gray_code" + state).classed("highlighted", true);
 
         var test = last_state + state;
         if(test == "1101" || test == "0100" || test == "0010" || test == "1011") {
             encoderValue++;
-            center_g.append("text").text("+1").attr("text-anchor", "middle").attr("y", 50).transition().duration(500).tween("x", function() {
+            center_g.append("text").text("+1").attr("text-anchor", "middle").attr("y", 50).attr("class", "popup_text").transition().duration(500).tween("x", function() {
                   var node = this;
                   var currentValue = +node.getAttribute("x");
 
@@ -193,7 +210,7 @@ function update() {
 
         if(test == "1110" || test == "0111" || test == "0001" || test == "1000") {
             encoderValue--;
-            center_g.append("text").text("-1").attr("text-anchor", "middle").attr("y", 50).transition().duration(500).tween("x", function() {
+            center_g.append("text").text("-1").attr("text-anchor", "middle").attr("y", 50).attr("class", "popup_text").transition().duration(500).tween("x", function() {
                   var node = this;
                   var currentValue = +node.getAttribute("x");
 
@@ -207,7 +224,7 @@ function update() {
         if(encoderValue >= 4) {
             encoderValue -= 4;
 
-            center_g.append("text").text("-4").attr("text-anchor", "middle").attr("y", 50).transition().duration(500).tween("x", function() {
+            center_g.append("text").text("-4").attr("text-anchor", "middle").attr("y", 50).attr("class", "popup_text").transition().duration(500).tween("x", function() {
                   var node = this;
                   var currentValue = +node.getAttribute("x");
 
@@ -217,7 +234,7 @@ function update() {
                   }
             }).remove();
 
-            center_g.append("text").text("Mouse Wheel Up!").attr("text-anchor", "middle").attr("y", 80).attr("class", "message").
+            center_g.append("text").text("Mouse Wheel Up!").attr("text-anchor", "middle").attr("class", "popup_text").attr("y", 80).
               transition().duration(500).tween('fastInSlowOut', function() {
                   var node = this;
                   var currentValue = +node.getAttribute("y");
@@ -231,7 +248,7 @@ function update() {
         if(encoderValue <= -4) {
             encoderValue += 4;
 
-            center_g.append("text").text("+4").attr("text-anchor", "middle").attr("y", 50).transition().duration(500).tween("x", function() {
+            center_g.append("text").text("+4").attr("text-anchor", "middle").attr("class", "popup_text").attr("y", 50).transition().duration(500).tween("x", function() {
                   var node = this;
                   var currentValue = +node.getAttribute("x");
 
@@ -241,7 +258,7 @@ function update() {
                   }
             }).remove();
 
-            center_g.append("text").text("Mouse Wheel Down!").attr("text-anchor", "middle").attr("y", 80).attr("class", "message").
+            center_g.append("text").text("Mouse Wheel Down!").attr("text-anchor", "middle").attr("class", "popup_text").attr("y", 80).
               transition().duration(500).tween('fastInSlowOut', function() {
                   var node = this;
                   var currentValue = +node.getAttribute("y");
@@ -311,9 +328,10 @@ function rotary_encoder() {
         center_g.append("rect").attr("x", i*box_width-4*box_width/2)
                                .attr("y", -box_height/2).attr("width", box_width)
                                .attr("height", box_height)
-                               .attr("fill", i == 0 ? "#96d6a3" : "white")
+                               .classed("highlighted", i == 0)
+                               .attr("fill", "none")
                                .attr("stroke", "black")
-                               .attr("class", "gray_code" + gray_codes[i%4]);
+                               .classed("gray_code" + gray_codes[i%4], true);
         center_g.append("text").attr("x", i*box_width-4*box_width/2+.5*box_width)
                                .attr("y", 0)
                                .attr("alignment-baseline", "middle")
