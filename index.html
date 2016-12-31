@@ -33,11 +33,7 @@ svg {
     fill: #cccccc;
 }
 
-path {
-    stroke: #cccccc;
-}
-
-rect {
+.gray_stroke {
     stroke: #cccccc;
 }
 
@@ -329,6 +325,7 @@ function rotary_encoder() {
                                .attr("y", -box_height/2).attr("width", box_width)
                                .attr("height", box_height)
                                .classed("highlighted", i == 0)
+                               .classed("gray_stroke", true)
                                .attr("fill", "none")
                                .attr("stroke", "black")
                                .classed("gray_code" + gray_codes[i%4], true);
@@ -362,14 +359,6 @@ function rotary_encoder() {
               attr("d", d).
               attr("fill", "#02afd3").
               attr("stroke", "#02afd3");
-              /*
-            g.append("g").attr("transform", "rotate(" + (-degrees/2) + ")").
-              append("path").
-                attr("d", "M " + inner_diameter/2 + " 0 L " + outer_diameter/2 + " 0 Z").
-                attr("stroke", "black").
-                attr("stroke-width", 1);
-
-                    */
 
             var or = outer_diameter/2;
             var ir = inner_diameter/2;
@@ -386,11 +375,11 @@ function rotary_encoder() {
             g.append("path").
               attr("d", d2).
               attr("fill", "none").
-              attr("stroke", "black");
+              classed("gray_stroke", true);
             g.append("path").
               attr("d", d3).
               attr("fill", "none").
-              attr("stroke", "black");
+              classed("gray_stroke", true);
         }
 
     }
